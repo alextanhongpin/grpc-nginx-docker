@@ -1,0 +1,49 @@
+version: '3.6'
+services:
+  server1:
+    image: alextanhongpin/grpc-server:latest
+    ports:
+      - 127.0.0.1:50051:50051
+    environment:
+      - PORT=:50051
+      - SSL_CERT=/run/secrets/nginx.cert
+      - SSL_KEY=/run/secrets/nginx.key
+    secrets:
+      - nginx.cert
+      - nginx.key
+
+  server2:
+    image: alextanhongpin/grpc-server:latest
+    ports:
+      - 127.0.0.1:50052:50052
+    environment:
+      - PORT=:50052
+      - SSL_CERT=/run/secrets/nginx.cert
+      - SSL_KEY=/run/secrets/nginx.key
+    secrets:
+      - nginx.cert
+      - nginx.key
+
+  client:
+    image: alextanhongpin/grpc-client:latest
+    environment:
+      - SSL_CERT=/run/secrets/nginx.cert
+      - SRV_URL=nginx:1443
+    secrets:
+      - nginx.cert
+
+  nginx:
+    image: nginx:1.13.11
+    ports:
+      - 127.0.0.1:1443:1443
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf
+    secrets:
+      - nginx.cert
+      - nginx.key
+
+secrets:
+  nginx.cert: 
+    file: ./cert/nginx.cert
+  nginx.key: 
+    file: ./cert/nginx.key
