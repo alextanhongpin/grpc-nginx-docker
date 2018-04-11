@@ -19,53 +19,46 @@ $ openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ./cert/nginx.key -
 At last, we configure our Træfik instance to use both self-signed certificates.
 
 
-```conf
+```nginx
 user nginx;
 
-# Ideally # of worker processes = # of CPUs or cores
-# max_clients = worker_processes * worker_connections
 worker_processes auto;
 
-# Maximum number of open file descriptors per process
-# should be > worker_connections
 worker_rlimit_nofile 10240;
 
-events {
-}
+# Leave this empty for now
+events {}
 
 http {
-    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
-                      '$status $body_bytes_sent "$http_referer" '
-                      '"$http_user_agent"';
+	log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+					  '$status $body_bytes_sent "$http_referer" '
+					  '"$http_user_agent"';
 
-    map $http_upgrade $connection_upgrade {
-        default upgrade;
-        ''      close;
-    }
+	map $http_upgrade $connection_upgrade {
+		default upgrade;
+		''        close;
+	}
 
-    # Load-balance your services across different instances
-    # You can use nomad-template for automatic service discovery rather
-    # than hard-coding the template here
-		upstream grpcservers {
-				# The docker endpoint of your grpc servers, you can have multiple here
-				server server1:50051;
-        server server2:50052;
+	upstream grpcservers {
+		# The docker endpoint of your grpc servers, you can have multiple here
+		server server1:50051;
+		server server2:50052;
+	}
+
+	server {
+		listen 1443 ssl http2;
+
+		# Create a certificate that points to the hostname, e.g. nginx for docker
+		# $ openssl req -nodes -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -subj '/CN=nginx'
+		ssl_certificate     /run/secrets/nginx.cert;
+		ssl_certificate_key /run/secrets/nginx.key;
+
+		location /echo.EchoService {
+			# Replace localhost:50051 with the address and port of your gRPC server
+			# The 'grpc://' prefix is optional; unencrypted gRPC is the default
+			grpc_pass grpcs://grpcservers;
 		}
- 
-    server {
-				listen 1443 ssl http2;
-		
-				# Create a certificate that points to the hostname, e.g. nginx for docker
-				ssl_certificate     /run/secrets/nginx.cert;
-				ssl_certificate_key /run/secrets/nginx.key;
- 
-        # The pattern is /package/service, which can be found in your proto file
-        location /echo.EchoService {
-            # Replace localhost:50051 with the address and port of your gRPC server
-            # The 'grpc://' prefix is optional; unencrypted gRPC is the default
-						grpc_pass grpcs://grpcservers;
-        }
-    }
+	}
 }
 ```
 
